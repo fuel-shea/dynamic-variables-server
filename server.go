@@ -2,135 +2,89 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/garyburd/redigo/redis"
+	"github.com/gorilla/mux"
 	"net/http"
-	"net/url"
-	"strings"
-	"time"
 )
 
-var pool *redis.Pool
-
 func main() {
-	pool = newPool()
-	if err := populateRedis(); err != nil {
-		panic(err)
-	}
+	r := mux.NewRouter()
 
-	http.HandleFunc("/cohortvalues", cohortValsForFeats)
-	http.ListenAndServe(":8080", nil)
+	r.Path("/features").
+		HandlerFunc(FeaturesHandler).
+		Methods("POST").
+		Headers("Content-Type", "application/json").
+		Name("setFeatures")
+
+	http.Handle("/", r)
+	http.ListenAndServe(":3030", nil)
 }
 
-func cohortValsForFeats(w http.ResponseWriter, r *http.Request) {
-	conn := pool.Get()
-	defer conn.Close()
-
-	params, err := buildParams(r.URL.Query(), conn)
-	if err != nil {
-		fmt.Fprintf(w, "%#v\n", err)
+func FeaturesHandler(w http.ResponseWriter, r *http.Request) {
+	var jsonData interface{}
+	decodeErr := json.NewDecoder(r.Body).Decode(&jsonData)
+	if decodeErr != nil {
+		sendError(w, "Invalid JSON")
 		return
 	}
-	row := getMatchingRow(params)
-	vals := getRowVals(row)
-	fmt.Fprintf(w, "%#v\n", vals)
-}
 
-func buildParams(givenParams url.Values, conn redis.Conn) (map[string]string, error) {
-	features, err := redis.Strings(conn.Do("SMEMBERS", "features"))
-	if err != nil {
-		return nil, err
+	gameVars, gvErr := getGameVars(jsonData)
+	if gvErr != nil {
+		sendError(w, "Error parsing CSV")
+		return
 	}
-	builtParams := make(map[string]string)
-	for _, f := range features {
-		f = strings.ToLower(f)
-		if givenParamVals, found := givenParams[f]; found {
-			givenParamVal := strings.ToLower(givenParamVals[0])
-			builtParams[f] = givenParamVal
-		} else {
-			builtParams[f] = "any"
-		}
+
+	sendSuccess(w, gameVars)
+	return
+}
+
+func getGameVars(data interface{}) (map[string]interface{}, error) {
+	res := map[string]interface{}{
+		"max_score":     "1000",
+		"whammy_chance": "5",
 	}
-	return builtParams, nil
+	return res, nil
 }
 
-func getMatchingRow(params map[string]string) int {
-	// STUB
-	return 0
+func sendSuccess(w http.ResponseWriter, data map[string]interface{}) {
+	succObj := SuccRespObj{
+		Result: data,
+	}
+	succObj.Init()
+
+	json.NewEncoder(w).Encode(succObj)
 }
 
-func getRowVals(index int) map[string]string {
-	// STUB
-	return map[string]string{"val1": "1000", "val2": "5"}
-}
-
-func jsonifyMap(m interface{}) string {
-	b, _ := json.Marshal(m)
-	return string(b[:])
-}
-
-func newPool() *redis.Pool {
-	return &redis.Pool{
-		MaxIdle:     3,
-		IdleTimeout: 240 * time.Second,
-		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", ":6379")
-			if err != nil {
-				return nil, err
-			}
-			return c, err
-		},
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			_, err := c.Do("PING")
-			return err
+func sendError(w http.ResponseWriter, msg string) {
+	errObj := ErrRespObj{
+		ErrorObj: ErrDetailsObj{
+			Message:   msg,
+			ErrorCode: "ERROR",
 		},
 	}
+	errObj.Init()
+
+	json.NewEncoder(w).Encode(errObj)
 }
 
-func populateRedis() error {
-	conn := pool.Get()
-	defer conn.Close()
+type SuccRespObj struct {
+	Success bool                   `json:"success"`
+	Result  map[string]interface{} `json:"result"`
+}
 
-	if _, err := conn.Do("FLUSHALL"); err != nil {
-		return err
-	}
+func (sro *SuccRespObj) Init() {
+	sro.Success = true
+}
 
-	feats := []string{
-		"country",
-		"device",
-		"gender",
-	}
-	for _, feat := range feats {
-		if _, err := conn.Do("SADD", "features", feat); err != nil {
-			return err
-		}
-	}
+type ErrRespObj struct {
+	Success  bool          `json:"success"`
+	ErrorObj ErrDetailsObj `json:"error"`
+}
 
-	vals := []string{
-		"maxscore",
-		"random",
-	}
-	for _, val := range vals {
-		if _, err := conn.Do("SADD", "values", val); err != nil {
-			return err
-		}
-	}
+func (ero *ErrRespObj) Init() {
+	ero.Success = false
+}
 
-	cells := map[string][]string{
-		"country":  []string{"any", "CAN"},
-		"device":   []string{"any", "iOS"},
-		"gender":   []string{"any", "any"},
-		"maxscore": []string{"1000", "1100"},
-		"random":   []string{"5", "6"},
-	}
-	for colheader, colvals := range cells {
-		for _, colval := range colvals {
-			colval = strings.ToLower(colval)
-			if _, err := conn.Do("RPUSH", colheader, colval); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
+type ErrDetailsObj struct {
+	Message   string `json:"message"`
+	ErrorCode string `json:"errorcode"`
 }
