@@ -1,11 +1,5 @@
 {
 	"ImportPath": "DynoVarServer",
 	"GoVersion": "go1.2.1",
-	"Deps": [
-		{
-			"ImportPath": "github.com/ant0ine/go-json-rest/rest",
-			"Comment": "v2.1.0-5-g535011e",
-			"Rev": "535011e953e10bf66271a1fc802c9d0787ed8bdf"
-		}
-	]
+	"Deps": []
 }
