@@ -1,0 +1,5 @@
+UserID,,Country,,Region,,Device,,DeviceHardware,,OSVersion,,LTV,,GameVersion,,UserAge,,|,randomMax,whammyChance,floaterDuration
+any,=,any,=,any,=,iOS,=,any,=,any,=,any,=,any,=,any,=,,950,6,0.9
+any,=,CA,=,any,=,any,=,any,=,any,=,any,=,any,=,any,=,,1400,6,0.9
+any,=,any,=,any,=,any,=,any,=,any,=,any,=,any,=,5,>,,1500,6,0.9
+any,=,any,=,any,=,any,=,any,=,any,=,any,=,any,=,any,=,,950,6,1

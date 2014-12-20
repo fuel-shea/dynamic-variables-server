@@ -1,5 +1,5 @@
 {
-	"ImportPath": "DynoVarServer",
+	"ImportPath": "go-expt",
 	"GoVersion": "go1.2.1",
 	"Deps": [
 		{
@@ -9,6 +9,10 @@
 		{
 			"ImportPath": "github.com/gorilla/mux",
 			"Rev": "e444e69cbd2e2e3e0749a2f3c717cec491552bbf"
+		},
+		{
+			"ImportPath": "gopkg.in/mgo.v2",
+			"Rev": "e2e914857713db7497cca2bd7fc0b030fc9cb22d"
 		}
 	]
 }

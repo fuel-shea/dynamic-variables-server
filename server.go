@@ -3,10 +3,29 @@ package main
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
+	"gopkg.in/mgo.v2"
+	//"gopkg.in/mgo.v2/bson"
+	"go-expt/gdv"
 	"net/http"
 )
 
+var (
+	db   *mgo.Database
+	coll *mgo.Collection
+)
+
 func main() {
+	gdv.RunCSVReader()
+
+	sess, err := mgo.Dial("localhost")
+	if err != nil {
+		panic(err)
+	}
+	defer sess.Close()
+	coll = sess.DB("game_vars").C("game_vars")
+
+	populateColl(coll)
+
 	r := mux.NewRouter()
 
 	r.Path("/features").
@@ -16,7 +35,7 @@ func main() {
 		Name("setFeatures")
 
 	http.Handle("/", r)
-	http.ListenAndServe(":3030", nil)
+	http.ListenAndServe(":3031", nil)
 }
 
 func FeaturesHandler(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +83,47 @@ func sendError(w http.ResponseWriter, msg string) {
 	errObj.Init()
 
 	json.NewEncoder(w).Encode(errObj)
+}
+
+// DB
+
+func populateColl(coll *mgo.Collection) {
+	rows := []Row{
+		Row{
+			F: Feature{
+				Type: "country",
+				Val:  "CAN",
+				Expr: "=",
+			},
+			GV: GameVar{
+				Type: "whammy_chance",
+				Val:  "5",
+			},
+		},
+	}
+	for _, r := range rows {
+		if err := coll.Insert(r); err != nil {
+			panic(err)
+		}
+	}
+}
+
+// structs
+
+type Row struct {
+	F  Feature `bson:"feature"`
+	GV GameVar `bson:"game_var"`
+}
+
+type Feature struct {
+	Type string `bson:"type"`
+	Val  string `bson:"val"`
+	Expr string `bson:"expr"`
+}
+
+type GameVar struct {
+	Type string `bson:"type"`
+	Val  string `bson:"val"`
 }
 
 type SuccRespObj struct {
