@@ -1,0 +1,11 @@
+{
+	"ImportPath": "go-expt/gdv",
+	"GoVersion": "go1.2.1",
+	"Deps": [
+		{
+			"ImportPath": "bitbucket.org/kardianos/osext",
+			"Comment": "null-15",
+			"Rev": "44140c5fc69ecf1102c5ef451d73cd98ef59b178"
+		}
+	]
+}

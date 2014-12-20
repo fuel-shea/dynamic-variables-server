@@ -1,73 +1,17 @@
 package gdv
 
 import (
+	"bitbucket.org/kardianos/osext"
 	"encoding/csv"
 	"fmt"
 	"math"
 	"os"
+	"path"
 )
 
-func RunCSVReader() {
+type FeatureMap []map[string]map[string]interface{}
 
-	fmt.Printf("Generating FeatureMap\n\n")
-
-	gameFeatureMap := readDynamicsMap("53e256d96170706e28063201")
-
-	fmt.Printf("Testing FeatureMap\n\n")
-
-	// run a test
-	// match against the following values and return the correct lines
-
-	testValues1 := map[string]string{
-		"Country": "CA",
-	}
-	fmt.Printf("testFeatures %s\n", testValues1)
-	testResult1 := resultFromFeatures(testValues1, gameFeatureMap)
-	fmt.Printf("result1 %s\n", testResult1)
-
-	testValues2 := map[string]string{
-		"Country": "CA",
-		"Device":  "iOS",
-	}
-	fmt.Printf("testFeatures %s\n", testValues2)
-	testResult2 := resultFromFeatures(testValues2, gameFeatureMap)
-	fmt.Printf("result2 %s\n", testResult2)
-
-	testValues3 := map[string]string{
-		"Country": "CA",
-		"Device":  "Android",
-	}
-	fmt.Printf("testFeatures %s\n", testValues3)
-	testResult3 := resultFromFeatures(testValues3, gameFeatureMap)
-	fmt.Printf("result3 %s\n", testResult3)
-
-	testValues4 := map[string]string{
-		"Device":  "Android",
-		"UserAge": "5",
-	}
-	fmt.Printf("testFeatures %s\n", testValues4)
-	testResult4 := resultFromFeatures(testValues4, gameFeatureMap)
-	fmt.Printf("result4 %s\n", testResult4)
-
-	testValues5 := map[string]string{
-		"Device":  "Android",
-		"UserAge": "6",
-	}
-	fmt.Printf("testFeatures %s\n", testValues5)
-	testResult5 := resultFromFeatures(testValues5, gameFeatureMap)
-	fmt.Printf("result5 %s\n", testResult5)
-
-	testValues6 := map[string]string{
-		"Device":  "iOS",
-		"UserAge": "6",
-	}
-	fmt.Printf("testFeatures %s\n", testValues6)
-	testResult6 := resultFromFeatures(testValues6, gameFeatureMap)
-	fmt.Printf("result6 %s\n", testResult6)
-
-}
-
-func resultFromFeatures(featureMatch map[string]string, featureMap []map[string]map[string]interface{}) map[string]interface{} {
+func ResultFromFeatures(featureMatch map[string]string, featureMap FeatureMap) map[string]interface{} {
 
 	// go and find the first row that matches this criteria
 	result := map[string]interface{}{}
@@ -120,17 +64,19 @@ func resultFromFeatures(featureMatch map[string]string, featureMap []map[string]
 	return result
 }
 
-func readDynamicsMap(gameId string) []map[string]map[string]interface{} {
+func ReadDynamicsMap(gameId string) (FeatureMap, error) {
 
-	csvfile, err := os.Open("/home/shea/go/src/go-expt/gdv/" + gameId + ".csv")
+	execDir, err := osext.ExecutableFolder()
+	if err != nil {
+		return nil, err
+	}
+	csvPath := path.Join(execDir, gameId+".csv")
 
-	featureMap := []map[string]map[string]interface{}{}
-
+	csvfile, err := os.Open(csvPath)
 	if err != nil {
 		fmt.Println(err)
-		return featureMap
+		return nil, err
 	}
-
 	defer csvfile.Close()
 
 	reader := csv.NewReader(csvfile)
@@ -143,6 +89,8 @@ func readDynamicsMap(gameId string) []map[string]map[string]interface{} {
 	}
 
 	// sanity check, display to standard output
+
+	featureMap := FeatureMap{}
 
 	valueStartIndex := math.MaxUint32
 	featureNames := []string{}
@@ -202,7 +150,5 @@ func readDynamicsMap(gameId string) []map[string]map[string]interface{} {
 		}
 	}
 
-	fmt.Printf("featureMap %s\n\n", featureMap)
-
-	return featureMap
+	return featureMap, nil
 }

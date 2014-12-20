@@ -3,33 +3,21 @@ package main
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
-	"gopkg.in/mgo.v2"
-	//"gopkg.in/mgo.v2/bson"
 	"go-expt/gdv"
 	"net/http"
 )
 
-var (
-	db   *mgo.Database
-	coll *mgo.Collection
-)
-
 func main() {
-	gdv.RunCSVReader()
-
-	sess, err := mgo.Dial("localhost")
+	gameID := "53e256d96170706e28063201"
+	gdvs, err := gdv.ReadDynamicsMap(gameID)
 	if err != nil {
 		panic(err)
 	}
-	defer sess.Close()
-	coll = sess.DB("game_vars").C("game_vars")
-
-	populateColl(coll)
 
 	r := mux.NewRouter()
 
 	r.Path("/features").
-		HandlerFunc(FeaturesHandler).
+		HandlerFunc(FeaturesHandler(gdvs)).
 		Methods("POST").
 		Headers("Content-Type", "application/json").
 		Name("setFeatures")
@@ -38,30 +26,39 @@ func main() {
 	http.ListenAndServe(":3031", nil)
 }
 
-func FeaturesHandler(w http.ResponseWriter, r *http.Request) {
-	var jsonData interface{}
-	decodeErr := json.NewDecoder(r.Body).Decode(&jsonData)
-	if decodeErr != nil {
-		sendError(w, "Invalid JSON")
+func FeaturesHandler(gdvs gdv.FeatureMap) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var jsonData map[string]interface{}
+		decodeErr := json.NewDecoder(r.Body).Decode(&jsonData)
+		if decodeErr != nil {
+			sendError(w, "Invalid JSON")
+			return
+		}
+
+		params := buildParams(jsonData, gdvs)
+		gVars := gdv.ResultFromFeatures(params, gdvs)
+		sendSuccess(w, gVars)
 		return
 	}
-
-	gameVars, gvErr := getGameVars(jsonData)
-	if gvErr != nil {
-		sendError(w, "Error parsing CSV")
-		return
-	}
-
-	sendSuccess(w, gameVars)
-	return
 }
 
-func getGameVars(data interface{}) (map[string]interface{}, error) {
-	res := map[string]interface{}{
-		"max_score":     "1000",
-		"whammy_chance": "5",
+func buildParams(jsonData map[string]interface{}, gdvs gdv.FeatureMap) map[string]string {
+	firstRow := gdvs[0]["Criteria"]
+	features := make([]string, len(firstRow))
+	featIdx := 0
+	for critKey, _ := range firstRow {
+		features[featIdx] = critKey
+		featIdx++
 	}
-	return res, nil
+
+	params := map[string]string{}
+	for _, feat := range features {
+		if val, ok := jsonData[feat]; ok {
+			params[feat] = val.(string)
+		}
+	}
+
+	return params
 }
 
 func sendSuccess(w http.ResponseWriter, data map[string]interface{}) {
@@ -83,47 +80,6 @@ func sendError(w http.ResponseWriter, msg string) {
 	errObj.Init()
 
 	json.NewEncoder(w).Encode(errObj)
-}
-
-// DB
-
-func populateColl(coll *mgo.Collection) {
-	rows := []Row{
-		Row{
-			F: Feature{
-				Type: "country",
-				Val:  "CAN",
-				Expr: "=",
-			},
-			GV: GameVar{
-				Type: "whammy_chance",
-				Val:  "5",
-			},
-		},
-	}
-	for _, r := range rows {
-		if err := coll.Insert(r); err != nil {
-			panic(err)
-		}
-	}
-}
-
-// structs
-
-type Row struct {
-	F  Feature `bson:"feature"`
-	GV GameVar `bson:"game_var"`
-}
-
-type Feature struct {
-	Type string `bson:"type"`
-	Val  string `bson:"val"`
-	Expr string `bson:"expr"`
-}
-
-type GameVar struct {
-	Type string `bson:"type"`
-	Val  string `bson:"val"`
 }
 
 type SuccRespObj struct {
