@@ -5,6 +5,7 @@ import (
 	"github.com/gorilla/mux"
 	"go-expt/dynovars"
 	"go-expt/responder"
+	"log"
 	"net/http"
 )
 
@@ -23,7 +24,7 @@ func main() {
 		Name("setFeatures")
 
 	http.Handle("/", r)
-	http.ListenAndServe(":3030", nil)
+	log.Fatal(http.ListenAndServe(":3030", nil))
 }
 
 func FeaturesHandler(rules dynovars.RuleSet) func(w http.ResponseWriter, r *http.Request) {
