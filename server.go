@@ -20,7 +20,6 @@ func main() {
 	r.Path("/features").
 		HandlerFunc(FeaturesHandler(rules)).
 		Methods("POST").
-		Headers("Content-Type", "application/json").
 		Name("setFeatures")
 
 	http.Handle("/", r)
