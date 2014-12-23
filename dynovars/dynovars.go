@@ -4,12 +4,22 @@ import (
 	"bitbucket.org/kardianos/osext"
 	"encoding/csv"
 	"fmt"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	"math"
 	"os"
 	"path"
 )
 
+type DynoVarSource struct {
+	RuleSet RuleSet
+	MgoSess *mgo.Session
+	MgoDB   *mgo.Database
+	MgoColl *mgo.Collection
+}
+
 type RuleSet struct {
+	GameID        string
 	FeatureNames  []string
 	VariableNames []string
 	Rules         []Rule
@@ -32,13 +42,25 @@ type Feature struct {
 	Exp   string
 }
 
-func VarsFromFeatures(featureMatch map[string]string, ruleSet RuleSet) map[string]interface{} {
+func NewDynoVarSource() (DynoVarSource, error) {
+	dvs := DynoVarSource{}
+	err := dvs.Init()
+	return dvs, err
+}
+
+func (dvs *DynoVarSource) VarsFromFeatures(featureMatch map[string]string) (map[string]interface{}, error) {
 
 	// go and find the first row that matches this criteria
 	result := map[string]interface{}{}
 
+	ruleSet, err := dvs.retrieveRules()
+	if err != nil {
+		return nil, err
+	}
+	dvs.RuleSet = ruleSet
+
 	// run through the map for each critera and match against the incoming information
-	for _, rule := range ruleSet.Rules {
+	for _, rule := range dvs.RuleSet.Rules {
 		matched := true
 		for featureName, feature := range rule.Features {
 			matchValue := featureMatch[featureName]
@@ -75,42 +97,45 @@ func VarsFromFeatures(featureMatch map[string]string, ruleSet RuleSet) map[strin
 		}
 	}
 
-	return result
+	return result, nil
 }
 
-func BuildDynoVars(gameId string) (RuleSet, error) {
-	ruleSet := RuleSet{}
+func (dvs *DynoVarSource) Init() error {
+	gameID := "53e256d96170706e28063201" // TODO move into proper place
 
-	valueStartIndex := math.MaxUint32
-	rawCSVData, err := readCSVByGameId(gameId)
+	ruleSet := RuleSet{GameID: gameID}
+
+	varStartIdx := math.MaxUint32
+	rawCSVData, err := readCSVByGameId(gameID)
 	if err != nil {
-		return ruleSet, err
+		return err
 	}
-	for rowIndex, row := range rawCSVData {
-		if rowIndex == 0 {
-			for colIndex, value := range row {
+	for rowIdx, row := range rawCSVData {
+		if rowIdx == 0 {
+			for colIdx, value := range row {
 				if value == "|" {
-					valueStartIndex = colIndex
+					varStartIdx = colIdx
 				}
-				if colIndex > valueStartIndex {
+				if colIdx > varStartIdx {
 					// this is a variable
 					ruleSet.VariableNames = append(ruleSet.VariableNames, value)
-				} else if colIndex < valueStartIndex {
-					if colIndex%2 == 0 {
+				} else if colIdx < varStartIdx {
+					if colIdx%2 == 0 {
 						ruleSet.FeatureNames = append(ruleSet.FeatureNames, value)
 					}
 				}
 			}
+
 		} else {
 			rule := NewRule()
-			for colIndex, value := range row {
-				if colIndex > valueStartIndex {
+			for colIdx, value := range row {
+				if colIdx > varStartIdx {
 					// this is a variable
-					variableName := ruleSet.VariableNames[colIndex-valueStartIndex-1]
+					variableName := ruleSet.VariableNames[colIdx-varStartIdx-1]
 					rule.Variables[variableName] = value
 
-				} else if colIndex < valueStartIndex {
-					featureName := ruleSet.FeatureNames[colIndex/2]
+				} else if colIdx < varStartIdx {
+					featureName := ruleSet.FeatureNames[colIdx/2]
 					var feature Feature
 					if _, wasFound := rule.Features[featureName]; wasFound {
 						feature = rule.Features[featureName]
@@ -118,7 +143,7 @@ func BuildDynoVars(gameId string) (RuleSet, error) {
 						feature = Feature{}
 					}
 
-					if colIndex%2 == 0 {
+					if colIdx%2 == 0 {
 						// this is a feature value
 						feature.Value = value
 					} else {
@@ -133,7 +158,19 @@ func BuildDynoVars(gameId string) (RuleSet, error) {
 		}
 	}
 
-	return ruleSet, nil
+	if err := dvs.initDB(); err != nil {
+		fmt.Println(err) // TMP
+		return err
+	}
+
+	dvs.RuleSet = ruleSet
+	if err := dvs.persistRules(); err != nil {
+		fmt.Println(err) // TMP
+		dvs.RuleSet = RuleSet{}
+		return err
+	}
+
+	return nil
 }
 
 func readCSVByGameId(gameId string) ([][]string, error) {
@@ -160,4 +197,31 @@ func readCSVByGameId(gameId string) ([][]string, error) {
 	}
 
 	return rawCSVdata, nil
+}
+
+func (dvs *DynoVarSource) initDB() error {
+	if dvs.MgoSess == nil {
+		sess, err := mgo.Dial("localhost")
+		if err != nil {
+			return err
+		}
+		dvs.MgoSess = sess
+	}
+	if dvs.MgoDB == nil {
+		dvs.MgoDB = dvs.MgoSess.DB("dynovarsDB")
+	}
+	if dvs.MgoColl == nil {
+		dvs.MgoColl = dvs.MgoDB.C("dynovarsColl")
+	}
+	return nil
+}
+
+func (dvs DynoVarSource) persistRules() error {
+	return dvs.MgoColl.Insert(dvs.RuleSet)
+}
+
+func (dvs DynoVarSource) retrieveRules() (RuleSet, error) {
+	result := RuleSet{}
+	err := dvs.MgoColl.Find(bson.M{}).One(&result)
+	return result, err
 }
