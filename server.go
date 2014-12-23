@@ -3,13 +3,14 @@ package main
 import (
 	"encoding/json"
 	"github.com/gorilla/mux"
-	"go-expt/gdv"
+	"go-expt/dynovars"
+	"go-expt/responder"
 	"net/http"
 )
 
 func main() {
 	gameID := "53e256d96170706e28063201"
-	gdvs, err := gdv.ReadDynamicsMap(gameID)
+	gdvs, err := dynovars.BuildDynoVars(gameID)
 	if err != nil {
 		panic(err)
 	}
@@ -23,84 +24,32 @@ func main() {
 		Name("setFeatures")
 
 	http.Handle("/", r)
-	http.ListenAndServe(":3031", nil)
+	http.ListenAndServe(":3030", nil)
 }
 
-func FeaturesHandler(gdvs gdv.FeatureMap) func(w http.ResponseWriter, r *http.Request) {
+func FeaturesHandler(gdvs gdv.RuleSet) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var jsonData map[string]interface{}
 		decodeErr := json.NewDecoder(r.Body).Decode(&jsonData)
 		if decodeErr != nil {
-			sendError(w, "Invalid JSON")
+			responder.SendError(w, responder.ErrTypes["invalid_request"])
 			return
 		}
 
 		params := buildParams(jsonData, gdvs)
-		gVars := gdv.ResultFromFeatures(params, gdvs)
-		sendSuccess(w, gVars)
+		dVars := dynovars.VarsFromFeatures(params, gdvs)
+		responder.SendSuccess(w, dVars)
 		return
 	}
 }
 
-func buildParams(jsonData map[string]interface{}, gdvs gdv.FeatureMap) map[string]string {
-	firstRow := gdvs[0]["Criteria"]
-	features := make([]string, len(firstRow))
-	featIdx := 0
-	for critKey, _ := range firstRow {
-		features[featIdx] = critKey
-		featIdx++
-	}
-
+func buildParams(jsonData map[string]interface{}, gdvs gdv.RuleSet) map[string]string {
 	params := map[string]string{}
-	for _, feat := range features {
+	for _, feat := range gdvs.FeatureNames {
 		if val, ok := jsonData[feat]; ok {
 			params[feat] = val.(string)
 		}
 	}
 
 	return params
-}
-
-func sendSuccess(w http.ResponseWriter, data map[string]interface{}) {
-	succObj := SuccRespObj{
-		Result: data,
-	}
-	succObj.Init()
-
-	json.NewEncoder(w).Encode(succObj)
-}
-
-func sendError(w http.ResponseWriter, msg string) {
-	errObj := ErrRespObj{
-		ErrorObj: ErrDetailsObj{
-			Message:   msg,
-			ErrorCode: "ERROR",
-		},
-	}
-	errObj.Init()
-
-	json.NewEncoder(w).Encode(errObj)
-}
-
-type SuccRespObj struct {
-	Success bool                   `json:"success"`
-	Result  map[string]interface{} `json:"result"`
-}
-
-func (sro *SuccRespObj) Init() {
-	sro.Success = true
-}
-
-type ErrRespObj struct {
-	Success  bool          `json:"success"`
-	ErrorObj ErrDetailsObj `json:"error"`
-}
-
-func (ero *ErrRespObj) Init() {
-	ero.Success = false
-}
-
-type ErrDetailsObj struct {
-	Message   string `json:"message"`
-	ErrorCode string `json:"errorcode"`
 }
