@@ -10,7 +10,7 @@ import (
 
 func main() {
 	gameID := "53e256d96170706e28063201"
-	gdvs, err := dynovars.BuildDynoVars(gameID)
+	rules, err := dynovars.BuildDynoVars(gameID)
 	if err != nil {
 		panic(err)
 	}
@@ -18,7 +18,7 @@ func main() {
 	r := mux.NewRouter()
 
 	r.Path("/features").
-		HandlerFunc(FeaturesHandler(gdvs)).
+		HandlerFunc(FeaturesHandler(rules)).
 		Methods("POST").
 		Headers("Content-Type", "application/json").
 		Name("setFeatures")
@@ -27,7 +27,7 @@ func main() {
 	http.ListenAndServe(":3030", nil)
 }
 
-func FeaturesHandler(gdvs gdv.RuleSet) func(w http.ResponseWriter, r *http.Request) {
+func FeaturesHandler(rules dynovars.RuleSet) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var jsonData map[string]interface{}
 		decodeErr := json.NewDecoder(r.Body).Decode(&jsonData)
@@ -36,16 +36,16 @@ func FeaturesHandler(gdvs gdv.RuleSet) func(w http.ResponseWriter, r *http.Reque
 			return
 		}
 
-		params := buildParams(jsonData, gdvs)
-		dVars := dynovars.VarsFromFeatures(params, gdvs)
+		params := buildParams(jsonData, rules)
+		dVars := dynovars.VarsFromFeatures(params, rules)
 		responder.SendSuccess(w, dVars)
 		return
 	}
 }
 
-func buildParams(jsonData map[string]interface{}, gdvs gdv.RuleSet) map[string]string {
+func buildParams(jsonData map[string]interface{}, rules dynovars.RuleSet) map[string]string {
 	params := map[string]string{}
-	for _, feat := range gdvs.FeatureNames {
+	for _, feat := range rules.FeatureNames {
 		if val, ok := jsonData[feat]; ok {
 			params[feat] = val.(string)
 		}

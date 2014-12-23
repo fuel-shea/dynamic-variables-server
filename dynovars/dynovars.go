@@ -1,4 +1,4 @@
-package gdv
+package dynovars
 
 import (
 	"bitbucket.org/kardianos/osext"
