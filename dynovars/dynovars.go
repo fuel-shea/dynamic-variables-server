@@ -1,45 +1,17 @@
 package dynovars
 
 import (
-	"bitbucket.org/kardianos/osext"
-	"encoding/csv"
-	"fmt"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"math"
-	"os"
-	"path"
 )
 
 type DynoVarSource struct {
-	RuleSet RuleSet
-	MgoSess *mgo.Session
-	MgoDB   *mgo.Database
-	MgoColl *mgo.Collection
-}
-
-type RuleSet struct {
-	GameID        string
-	FeatureNames  []string
-	VariableNames []string
-	Rules         []Rule
-}
-
-type Rule struct {
-	Features  map[string]Feature
-	Variables map[string]interface{}
-}
-
-func NewRule() Rule {
-	return Rule{
-		Features:  make(map[string]Feature),
-		Variables: make(map[string]interface{}),
-	}
-}
-
-type Feature struct {
-	Value string
-	Exp   string
+	MgoSess       *mgo.Session
+	MgoDB         *mgo.Database
+	FeatsColl     *mgo.Collection
+	FeatTypesColl *mgo.Collection
+	VarsColl      *mgo.Collection
+	VarTypesColl  *mgo.Collection
 }
 
 func NewDynoVarSource() (DynoVarSource, error) {
@@ -48,158 +20,112 @@ func NewDynoVarSource() (DynoVarSource, error) {
 	return dvs, err
 }
 
-func (dvs *DynoVarSource) VarsFromFeatures(featureMatch map[string]string) (map[string]interface{}, error) {
+func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]string, gameID string) (map[string]string, error) {
 
-	// go and find the first row that matches this criteria
-	result := map[string]interface{}{}
-
-	ruleSet, err := dvs.retrieveRules()
-	if err != nil {
-		return nil, err
+	var featTypeRes bson.M
+	if err := dvs.FeatTypesColl.
+		Find(bson.M{"game_id": gameID}).
+		One(&featTypeRes); err != nil {
+		return map[string]string{}, err
 	}
-	dvs.RuleSet = ruleSet
+	featureTypes := ifArray2StrArray(featTypeRes["types"].([]interface{}))
 
-	// run through the map for each critera and match against the incoming information
-	for _, rule := range dvs.RuleSet.Rules {
-		matched := true
-		for featureName, feature := range rule.Features {
-			matchValue := featureMatch[featureName]
+	nRules, err := dvs.VarsColl.Count()
+	if err != nil {
+		return map[string]string{}, err
+	}
+	eligibleRules := make([]int, nRules)
+	for i := range eligibleRules {
+		eligibleRules[i] = i
+	}
 
-			if feature.Value != "any" {
-				if matchValue == "" {
-					matched = false
-					break
-				} else {
-					// use the expression to perform the test
-					switch feature.Exp {
-					case "<":
-						if matchValue >= feature.Value {
-							matched = false
-							break
-						}
-					case ">":
-						if matchValue <= feature.Value {
-							matched = false
-							break
-						}
-					case "=":
-						if matchValue != feature.Value {
-							matched = false
-							break
-						}
-					}
-				}
-			}
+	for _, featureType := range featureTypes {
+		matchVal, found := featureMatches[featureType]
+		if !found {
+			matchVal = "any"
 		}
-		if matched {
-			result = rule.Variables
-			break
+
+		pipe := []bson.M{
+			// match the features
+			bson.M{
+				"$match": bson.M{
+					"game_id":  gameID,
+					"rule_idx": bson.M{"$in": eligibleRules},
+					"type":     featureType,
+					"$or": []bson.M{
+						// the value can be "any"
+						bson.M{"value": "any"},
+						// if the modifier is "=", the value can exactly match the feature
+						bson.M{"$and": []bson.M{
+							bson.M{"mod": "="}, bson.M{"value": matchVal}},
+						},
+						// if the modifier is ">", the value can be greater than the feature
+						bson.M{"$and": []bson.M{
+							bson.M{"mod": ">"}, bson.M{"value": bson.M{"$gt": matchVal}}},
+						},
+						// if the modifier is "<", the value can be less than the feature
+						bson.M{"$and": []bson.M{
+							bson.M{"mod": "<"}, bson.M{"value": bson.M{"$lt": matchVal}}},
+						},
+					},
+				},
+			},
+
+			// make the entire unique and only include "rule_idx" field
+			bson.M{
+				"$group": bson.M{
+					"_id": bson.M{"rule_idx": "$rule_idx"},
+				},
+			},
+
+			// sort them by index/priority
+			bson.M{
+				"$sort": bson.M{"_id.rule_idx": 1},
+			},
+
+			// flatten it
+			bson.M{
+				"$project": bson.M{
+					"rule_idx": "$_id.rule_idx",
+					"_id":      0,
+				},
+			},
 		}
+
+		var ruleIdxRes []bson.M
+		if err := dvs.FeatsColl.Pipe(pipe).All(&ruleIdxRes); err != nil {
+			return map[string]string{}, err
+		}
+		newEligibleRules := make([]int, len(ruleIdxRes))
+		for i, ruleIdx := range ruleIdxRes {
+			newEligibleRules[i] = int(ruleIdx["rule_idx"].(float64))
+		}
+		eligibleRules = newEligibleRules
+	}
+
+	// TODO ensure rule exists
+	winningRuleIdx := eligibleRules[0]
+
+	var winningRuleVars bson.M
+	if err := dvs.VarsColl.Find(bson.M{"rule_idx": winningRuleIdx}).One(&winningRuleVars); err != nil {
+		return map[string]string{}, err
+	}
+
+	var varTypesRes bson.M
+	if err := dvs.VarTypesColl.Find(bson.M{"game_id": gameID}).One(&varTypesRes); err != nil {
+		return map[string]string{}, err
+	}
+	varTypes := ifArray2StrArray(varTypesRes["types"].([]interface{}))
+
+	result := make(map[string]string)
+	for _, varType := range varTypes {
+		result[varType] = winningRuleVars[varType].(string)
 	}
 
 	return result, nil
 }
 
 func (dvs *DynoVarSource) Init() error {
-	gameID := "53e256d96170706e28063201" // TODO move into proper place
-
-	ruleSet := RuleSet{GameID: gameID}
-
-	varStartIdx := math.MaxUint32
-	rawCSVData, err := readCSVByGameId(gameID)
-	if err != nil {
-		return err
-	}
-	for rowIdx, row := range rawCSVData {
-		if rowIdx == 0 {
-			for colIdx, value := range row {
-				if value == "|" {
-					varStartIdx = colIdx
-				}
-				if colIdx > varStartIdx {
-					// this is a variable
-					ruleSet.VariableNames = append(ruleSet.VariableNames, value)
-				} else if colIdx < varStartIdx {
-					if colIdx%2 == 0 {
-						ruleSet.FeatureNames = append(ruleSet.FeatureNames, value)
-					}
-				}
-			}
-
-		} else {
-			rule := NewRule()
-			for colIdx, value := range row {
-				if colIdx > varStartIdx {
-					// this is a variable
-					variableName := ruleSet.VariableNames[colIdx-varStartIdx-1]
-					rule.Variables[variableName] = value
-
-				} else if colIdx < varStartIdx {
-					featureName := ruleSet.FeatureNames[colIdx/2]
-					var feature Feature
-					if _, wasFound := rule.Features[featureName]; wasFound {
-						feature = rule.Features[featureName]
-					} else {
-						feature = Feature{}
-					}
-
-					if colIdx%2 == 0 {
-						// this is a feature value
-						feature.Value = value
-					} else {
-						// this is a feature modifier
-						feature.Exp = value
-					}
-					rule.Features[featureName] = feature
-				}
-			}
-
-			ruleSet.Rules = append(ruleSet.Rules, rule)
-		}
-	}
-
-	if err := dvs.initDB(); err != nil {
-		fmt.Println(err) // TMP
-		return err
-	}
-
-	dvs.RuleSet = ruleSet
-	if err := dvs.persistRules(); err != nil {
-		fmt.Println(err) // TMP
-		dvs.RuleSet = RuleSet{}
-		return err
-	}
-
-	return nil
-}
-
-func readCSVByGameId(gameId string) ([][]string, error) {
-	execDir, err := osext.ExecutableFolder()
-	if err != nil {
-		return nil, err
-	}
-	csvPath := path.Join(execDir, gameId+".csv")
-
-	csvfile, err := os.Open(csvPath)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	defer csvfile.Close()
-
-	reader := csv.NewReader(csvfile)
-	reader.FieldsPerRecord = -1 // see the Reader struct information below
-
-	rawCSVdata, err := reader.ReadAll()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	return rawCSVdata, nil
-}
-
-func (dvs *DynoVarSource) initDB() error {
 	if dvs.MgoSess == nil {
 		sess, err := mgo.Dial("localhost")
 		if err != nil {
@@ -208,20 +134,28 @@ func (dvs *DynoVarSource) initDB() error {
 		dvs.MgoSess = sess
 	}
 	if dvs.MgoDB == nil {
-		dvs.MgoDB = dvs.MgoSess.DB("dynovarsDB")
+		dvs.MgoDB = dvs.MgoSess.DB("dynovars2")
 	}
-	if dvs.MgoColl == nil {
-		dvs.MgoColl = dvs.MgoDB.C("dynovarsColl")
+	if dvs.VarsColl == nil {
+		dvs.VarsColl = dvs.MgoDB.C("variables")
+	}
+	if dvs.FeatsColl == nil {
+		dvs.FeatsColl = dvs.MgoDB.C("features")
+	}
+	if dvs.FeatTypesColl == nil {
+		dvs.FeatTypesColl = dvs.MgoDB.C("feat_types")
+	}
+	if dvs.VarTypesColl == nil {
+		dvs.VarTypesColl = dvs.MgoDB.C("var_types")
 	}
 	return nil
 }
 
-func (dvs DynoVarSource) persistRules() error {
-	return dvs.MgoColl.Insert(dvs.RuleSet)
-}
-
-func (dvs DynoVarSource) retrieveRules() (RuleSet, error) {
-	result := RuleSet{}
-	err := dvs.MgoColl.Find(bson.M{}).One(&result)
-	return result, err
+func ifArray2StrArray(ifArray []interface{}) []string {
+	nElems := len(ifArray)
+	strs := make([]string, nElems)
+	for i := 0; i < nElems; i++ {
+		strs[i] = ifArray[i].(string)
+	}
+	return strs
 }

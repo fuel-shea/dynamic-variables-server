@@ -35,7 +35,7 @@ func FeaturesHandler(dvSrc dynovars.DynoVarSource) func(w http.ResponseWriter, r
 		}
 
 		params := buildParams(jsonData, dvSrc)
-		dVars, err := dvSrc.VarsFromFeatures(params)
+		dVars, err := dvSrc.VarsFromFeatures(params, "gid1")
 		if err != nil {
 			fmt.Println(err)
 			responder.SendError(w, responder.ErrTypes["general_error"])
