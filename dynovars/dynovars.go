@@ -1,6 +1,7 @@
 package dynovars
 
 import (
+	"github.com/fuel-shea/fuel-go-utils/fuelutils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -29,7 +30,7 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}
 		One(&featTypeRes); err != nil {
 		return blankReturnVal, err
 	}
-	featureTypes := interfaceArr2StringArr(featTypeRes["types"].([]interface{}))
+	featureTypes := fuelutils.InterfaceArr2StringArr(featTypeRes["types"].([]interface{}))
 
 	nRules, err := dvs.VarsColl.Count()
 	if err != nil {
@@ -118,7 +119,7 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}
 	if err := dvs.VarTypesColl.Find(bson.M{"game_id": gameID}).One(&varTypesRes); err != nil {
 		return blankReturnVal, err
 	}
-	varTypes := interfaceArr2StringArr(varTypesRes["types"].([]interface{}))
+	varTypes := fuelutils.InterfaceArr2StringArr(varTypesRes["types"].([]interface{}))
 
 	result := make(map[string]interface{})
 	for _, varType := range varTypes {
@@ -152,13 +153,4 @@ func (dvs *DynoVarSource) Init() error {
 		dvs.VarTypesColl = dvs.MgoDB.C("var_types")
 	}
 	return nil
-}
-
-func interfaceArr2StringArr(ifArray []interface{}) []string {
-	nElems := len(ifArray)
-	strs := make([]string, nElems)
-	for i := 0; i < nElems; i++ {
-		strs[i] = ifArray[i].(string)
-	}
-	return strs
 }

@@ -3,9 +3,12 @@
 	"GoVersion": "go1.2.1",
 	"Deps": [
 		{
-			"ImportPath": "bitbucket.org/kardianos/osext",
-			"Comment": "null-15",
-			"Rev": "44140c5fc69ecf1102c5ef451d73cd98ef59b178"
+			"ImportPath": "github.com/fuel-shea/fuel-go-utils/fuelresponder",
+			"Rev": "bf2d5e6365388b5227df02f09a88abbdde71be31"
+		},
+		{
+			"ImportPath": "github.com/fuel-shea/fuel-go-utils/fuelutils",
+			"Rev": "bf2d5e6365388b5227df02f09a88abbdde71be31"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",
@@ -14,6 +17,10 @@
 		{
 			"ImportPath": "github.com/gorilla/mux",
 			"Rev": "e444e69cbd2e2e3e0749a2f3c717cec491552bbf"
+		},
+		{
+			"ImportPath": "gopkg.in/mgo.v2",
+			"Rev": "e2e914857713db7497cca2bd7fc0b030fc9cb22d"
 		}
 	]
 }

@@ -1,4 +1,4 @@
-package responder
+package fuelresponder
 
 import (
 	"encoding/json"
