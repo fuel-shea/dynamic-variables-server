@@ -1,10 +1,11 @@
 (function addAllData() {
     db.dropDatabase();
 
+    var gameId = "gid1";
     var rules = [
         {
             rule_idx: 0,
-            game_id: "gid1",
+            game_id: gameId,
             features: [
                 { "type" : "UserID", "value" : "any", "mod" : "=" },
                 { "type" : "Country", "value" : "any", "mod" : "=" },
@@ -24,7 +25,7 @@
         },
         {
             rule_idx: 1,
-            game_id: "gid1",
+            game_id: gameId,
             features: [
                 { "type" : "Device", "value" : "any", "mod" : "=" },
                 { "type" : "LTV", "value" : "any", "mod" : "=" },
@@ -44,7 +45,7 @@
         },
         {
             rule_idx: 2,
-            game_id: "gid1",
+            game_id: gameId,
             features: [
                 { "type" : "UserID", "value" : "any", "mod" : "=" },
                 { "type" : "Country", "value" : "any", "mod" : "=" },
@@ -64,7 +65,7 @@
         },
         {
             rule_idx: 3,
-            game_id: "gid1",
+            game_id: gameId,
             features: [
                 { "type" : "UserID", "value" : "any", "mod" : "=" },
                 { "type" : "Country", "value" : "any", "mod" : "=" },
@@ -85,8 +86,8 @@
     ];
 
     (function addFeatureData() {
+        var featureTypes = [];
         rules.forEach(function(r) {
-            var featureTypes = [];
             r.features.forEach(function(f) {
                 featureTypes.push(f.type);
                 var fObj = {
@@ -100,14 +101,14 @@
             });
         });
         db.feat_types.insert({
-            game_id: r.game_id,
+            game_id: gameId,
             types: featureTypes,
         });
     })();
 
     (function addVariableData() {
+        var varTypes = [];
         rules.forEach(function(r) {
-            var varTypes = [];
             var vObj = {
                 game_id: r.game_id,
                 rule_idx: r.rule_idx
@@ -119,7 +120,7 @@
             db.variables.insert(vObj);
         });
         db.var_types.insert({
-            game_id: r.game_id,
+            game_id: gameId,
             types: varTypes,
         });
     })();

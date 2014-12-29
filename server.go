@@ -26,6 +26,7 @@ func FeaturesHandler(w http.ResponseWriter, r *http.Request) {
 		fuelresponder.SendError(w, fuelresponder.ErrTypes["empty_result"])
 		return
 	}
+	defer dvSrc.CleanUp()
 
 	var jsonData map[string]interface{}
 	decodeErr := json.NewDecoder(r.Body).Decode(&jsonData)

@@ -1,6 +1,7 @@
 package dynamicvariables
 
 import (
+	"errors"
 	"github.com/fuel-shea/fuel-go-utils/fuelutils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -41,6 +42,8 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}
 		eligibleRules[i] = i
 	}
 
+	pipe := PipeSkeleton(gameID)
+
 	for _, featureType := range featureTypes {
 		matchVal, found := featureMatches[featureType]
 		if !found {
@@ -49,55 +52,9 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}
 			matchVal = matchVal.(string)
 		}
 
-		pipe := []bson.M{
-			// match the features
-			bson.M{
-				"$match": bson.M{
-					"game_id":  gameID,
-					"rule_idx": bson.M{"$in": eligibleRules},
-					"type":     featureType,
-					"$or": []bson.M{
-						// the value can be "any"
-						bson.M{"value": "any"},
-						// if the modifier is "=", the value can exactly match the feature
-						bson.M{"$and": []bson.M{
-							bson.M{"mod": "="}, bson.M{"value": matchVal}},
-						},
-						// if the modifier is ">", the value can be greater than the feature
-						bson.M{"$and": []bson.M{
-							bson.M{"mod": ">"}, bson.M{"value": bson.M{"$gt": matchVal}}},
-						},
-						// if the modifier is "<", the value can be less than the feature
-						bson.M{"$and": []bson.M{
-							bson.M{"mod": "<"}, bson.M{"value": bson.M{"$lt": matchVal}}},
-						},
-					},
-				},
-			},
-
-			// make the entire unique and only include "rule_idx" field
-			bson.M{
-				"$group": bson.M{
-					"_id": bson.M{"rule_idx": "$rule_idx"},
-				},
-			},
-
-			// sort them by index/priority
-			bson.M{
-				"$sort": bson.M{"_id.rule_idx": 1},
-			},
-
-			// flatten it
-			bson.M{
-				"$project": bson.M{
-					"rule_idx": "$_id.rule_idx",
-					"_id":      0,
-				},
-			},
-		}
-
 		var ruleIdxRes []bson.M
-		if err := dvs.FeatsColl.Pipe(pipe).All(&ruleIdxRes); err != nil {
+		pipe.UpdateForLoop(eligibleRules, featureType, matchVal)
+		if err := dvs.FeatsColl.Pipe(pipe.Pipe).All(&ruleIdxRes); err != nil {
 			return blankReturnVal, err
 		}
 		newEligibleRules := make([]int, len(ruleIdxRes))
@@ -105,9 +62,15 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}
 			newEligibleRules[i] = int(ruleIdx["rule_idx"].(float64))
 		}
 		eligibleRules = newEligibleRules
-	}
 
-	// TODO ensure rule exists
+		if len(eligibleRules) == 1 {
+			break
+		}
+
+		if len(eligibleRules) == 0 {
+			return blankReturnVal, errors.New("No rules matched query")
+		}
+	}
 	winningRuleIdx := eligibleRules[0]
 
 	var winningRuleVars bson.M
@@ -137,20 +100,14 @@ func (dvs *DynoVarSource) Init() error {
 		}
 		dvs.MgoSess = sess
 	}
-	if dvs.MgoDB == nil {
-		dvs.MgoDB = dvs.MgoSess.DB("dynovars2")
-	}
-	if dvs.VarsColl == nil {
-		dvs.VarsColl = dvs.MgoDB.C("variables")
-	}
-	if dvs.FeatsColl == nil {
-		dvs.FeatsColl = dvs.MgoDB.C("features")
-	}
-	if dvs.FeatTypesColl == nil {
-		dvs.FeatTypesColl = dvs.MgoDB.C("feat_types")
-	}
-	if dvs.VarTypesColl == nil {
-		dvs.VarTypesColl = dvs.MgoDB.C("var_types")
-	}
+	dvs.MgoDB = dvs.MgoSess.DB("dynamicvariables")
+	dvs.VarsColl = dvs.MgoDB.C("variables")
+	dvs.FeatsColl = dvs.MgoDB.C("features")
+	dvs.FeatTypesColl = dvs.MgoDB.C("feat_types")
+	dvs.VarTypesColl = dvs.MgoDB.C("var_types")
 	return nil
+}
+
+func (dvs *DynoVarSource) CleanUp() {
+	dvs.MgoSess.Close()
 }
