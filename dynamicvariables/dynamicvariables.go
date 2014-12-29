@@ -1,4 +1,4 @@
-package dynovars
+package dynamicvariables
 
 import (
 	"github.com/fuel-shea/fuel-go-utils/fuelutils"

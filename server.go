@@ -1,11 +1,11 @@
 package main
 
 import (
+	"dynamic-variables-server/dynamicvariables"
 	"encoding/json"
 	"fmt"
 	"github.com/fuel-shea/fuel-go-utils/fuelresponder"
 	"github.com/gorilla/mux"
-	"go-expt/dynovars"
 	"log"
 	"net/http"
 )
@@ -21,7 +21,7 @@ func main() {
 }
 
 func FeaturesHandler(w http.ResponseWriter, r *http.Request) {
-	dvSrc, err := dynovars.NewDynoVarSource()
+	dvSrc, err := dynamicvariables.NewDynoVarSource()
 	if err != nil {
 		fuelresponder.SendError(w, fuelresponder.ErrTypes["empty_result"])
 		return
