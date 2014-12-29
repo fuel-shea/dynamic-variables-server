@@ -8,12 +8,11 @@ import (
 )
 
 type DynoVarSource struct {
-	MgoSess       *mgo.Session
-	MgoDB         *mgo.Database
-	FeatsColl     *mgo.Collection
-	FeatTypesColl *mgo.Collection
-	VarsColl      *mgo.Collection
-	VarTypesColl  *mgo.Collection
+	MgoSess      *mgo.Session
+	MgoDB        *mgo.Database
+	GameDataColl *mgo.Collection
+	FeatsColl    *mgo.Collection
+	VarsColl     *mgo.Collection
 }
 
 func NewDynoVarSource() (DynoVarSource, error) {
@@ -25,18 +24,16 @@ func NewDynoVarSource() (DynoVarSource, error) {
 func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}, gameID string) (map[string]interface{}, error) {
 	blankReturnVal := make(map[string]interface{})
 
-	var featTypeRes bson.M
-	if err := dvs.FeatTypesColl.
+	var gameDataRes bson.M
+	if err := dvs.GameDataColl.
 		Find(bson.M{"game_id": gameID}).
-		One(&featTypeRes); err != nil {
+		One(&gameDataRes); err != nil {
 		return blankReturnVal, err
 	}
-	featureTypes := fuelutils.InterfaceArr2StringArr(featTypeRes["types"].([]interface{}))
+	nRules := int(gameDataRes["num_rules"].(float64))
+	featTypes := fuelutils.InterfaceArr2StringArr(gameDataRes["feature_types"].([]interface{}))
+	varTypes := fuelutils.InterfaceArr2StringArr(gameDataRes["variable_types"].([]interface{}))
 
-	nRules, err := dvs.VarsColl.Count()
-	if err != nil {
-		return blankReturnVal, err
-	}
 	eligibleRules := make([]int, nRules)
 	for i := range eligibleRules {
 		eligibleRules[i] = i
@@ -44,7 +41,7 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}
 
 	pipe := PipeSkeleton(gameID)
 
-	for _, featureType := range featureTypes {
+	for _, featureType := range featTypes {
 		matchVal, found := featureMatches[featureType]
 		if !found {
 			matchVal = "any"
@@ -71,18 +68,12 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}
 			return blankReturnVal, errors.New("No rules matched query")
 		}
 	}
-	winningRuleIdx := eligibleRules[0]
 
+	winningRuleIdx := eligibleRules[0]
 	var winningRuleVars bson.M
 	if err := dvs.VarsColl.Find(bson.M{"rule_idx": winningRuleIdx}).One(&winningRuleVars); err != nil {
 		return blankReturnVal, err
 	}
-
-	var varTypesRes bson.M
-	if err := dvs.VarTypesColl.Find(bson.M{"game_id": gameID}).One(&varTypesRes); err != nil {
-		return blankReturnVal, err
-	}
-	varTypes := fuelutils.InterfaceArr2StringArr(varTypesRes["types"].([]interface{}))
 
 	result := make(map[string]interface{})
 	for _, varType := range varTypes {
@@ -103,8 +94,7 @@ func (dvs *DynoVarSource) Init() error {
 	dvs.MgoDB = dvs.MgoSess.DB("dynamicvariables")
 	dvs.VarsColl = dvs.MgoDB.C("variables")
 	dvs.FeatsColl = dvs.MgoDB.C("features")
-	dvs.FeatTypesColl = dvs.MgoDB.C("feat_types")
-	dvs.VarTypesColl = dvs.MgoDB.C("var_types")
+	dvs.GameDataColl = dvs.MgoDB.C("game_rule_data")
 	return nil
 }
 

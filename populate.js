@@ -85,44 +85,39 @@
         },
     ];
 
-    (function addFeatureData() {
-        var featureTypes = [];
-        rules.forEach(function(r) {
-            r.features.forEach(function(f) {
-                featureTypes.push(f.type);
-                var fObj = {
-                    game_id: r.game_id,
-                    rule_idx: r.rule_idx,
-                    type: f.type,
-                    value: f.value,
-                    mod: f.mod,
-                }
-                db.features.insert(fObj);
-            });
-        });
-        db.feat_types.insert({
-            game_id: gameId,
-            types: featureTypes,
-        });
-    })();
-
-    (function addVariableData() {
-        var varTypes = [];
-        rules.forEach(function(r) {
-            var vObj = {
+    var featureTypes = [];
+    rules.forEach(function(r) {
+        r.features.forEach(function(f) {
+            featureTypes.push(f.type);
+            var fObj = {
                 game_id: r.game_id,
-                rule_idx: r.rule_idx
-            };
-            for (var vKey in r.variables) {
-                varTypes.push(vKey);
-                vObj[vKey] = r.variables[vKey]
+                rule_idx: r.rule_idx,
+                type: f.type,
+                value: f.value,
+                mod: f.mod,
             }
-            db.variables.insert(vObj);
+            db.features.insert(fObj);
         });
-        db.var_types.insert({
-            game_id: gameId,
-            types: varTypes,
-        });
-    })();
+    });
+
+    var varTypes = [];
+    rules.forEach(function(r) {
+        var vObj = {
+            game_id: r.game_id,
+            rule_idx: r.rule_idx
+        };
+        for (var vKey in r.variables) {
+            varTypes.push(vKey);
+            vObj[vKey] = r.variables[vKey]
+        }
+        db.variables.insert(vObj);
+    });
+
+    db.game_rule_data.insert({
+        game_id: gameId,
+        variable_types: varTypes,
+        feature_types: featureTypes,
+        num_rules: rules.length,
+    });
 })();
 
