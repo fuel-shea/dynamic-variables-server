@@ -34,7 +34,14 @@ func FeaturesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dVars, err := dvSrc.VarsFromFeatures(jsonData, "gid1")
+	gameIDJSON, found := jsonData["game_id"]
+	if !found {
+		fuelresponder.SendError(w, fuelresponder.ErrTypes["invalid_request"])
+		return
+	}
+	gameID := gameIDJSON.(string)
+
+	dVars, err := dvSrc.VarsFromFeatures(jsonData, gameID)
 	if err != nil {
 		fmt.Println(err)
 		fuelresponder.SendError(w, fuelresponder.ErrTypes["general_error"])
