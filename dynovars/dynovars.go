@@ -20,19 +20,20 @@ func NewDynoVarSource() (DynoVarSource, error) {
 	return dvs, err
 }
 
-func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]string, gameID string) (map[string]string, error) {
+func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}, gameID string) (map[string]interface{}, error) {
+	blankReturnVal := make(map[string]interface{})
 
 	var featTypeRes bson.M
 	if err := dvs.FeatTypesColl.
 		Find(bson.M{"game_id": gameID}).
 		One(&featTypeRes); err != nil {
-		return map[string]string{}, err
+		return blankReturnVal, err
 	}
-	featureTypes := ifArray2StrArray(featTypeRes["types"].([]interface{}))
+	featureTypes := interfaceArr2StringArr(featTypeRes["types"].([]interface{}))
 
 	nRules, err := dvs.VarsColl.Count()
 	if err != nil {
-		return map[string]string{}, err
+		return blankReturnVal, err
 	}
 	eligibleRules := make([]int, nRules)
 	for i := range eligibleRules {
@@ -43,6 +44,8 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]string, gam
 		matchVal, found := featureMatches[featureType]
 		if !found {
 			matchVal = "any"
+		} else {
+			matchVal = matchVal.(string)
 		}
 
 		pipe := []bson.M{
@@ -94,7 +97,7 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]string, gam
 
 		var ruleIdxRes []bson.M
 		if err := dvs.FeatsColl.Pipe(pipe).All(&ruleIdxRes); err != nil {
-			return map[string]string{}, err
+			return blankReturnVal, err
 		}
 		newEligibleRules := make([]int, len(ruleIdxRes))
 		for i, ruleIdx := range ruleIdxRes {
@@ -108,18 +111,18 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]string, gam
 
 	var winningRuleVars bson.M
 	if err := dvs.VarsColl.Find(bson.M{"rule_idx": winningRuleIdx}).One(&winningRuleVars); err != nil {
-		return map[string]string{}, err
+		return blankReturnVal, err
 	}
 
 	var varTypesRes bson.M
 	if err := dvs.VarTypesColl.Find(bson.M{"game_id": gameID}).One(&varTypesRes); err != nil {
-		return map[string]string{}, err
+		return blankReturnVal, err
 	}
-	varTypes := ifArray2StrArray(varTypesRes["types"].([]interface{}))
+	varTypes := interfaceArr2StringArr(varTypesRes["types"].([]interface{}))
 
-	result := make(map[string]string)
+	result := make(map[string]interface{})
 	for _, varType := range varTypes {
-		result[varType] = winningRuleVars[varType].(string)
+		result[varType] = winningRuleVars[varType]
 	}
 
 	return result, nil
@@ -151,7 +154,7 @@ func (dvs *DynoVarSource) Init() error {
 	return nil
 }
 
-func ifArray2StrArray(ifArray []interface{}) []string {
+func interfaceArr2StringArr(ifArray []interface{}) []string {
 	nElems := len(ifArray)
 	strs := make([]string, nElems)
 	for i := 0; i < nElems; i++ {
