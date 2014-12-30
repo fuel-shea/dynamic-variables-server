@@ -1,4 +1,6 @@
 (function addAllData() {
+    var conn = new Mongo();
+    db = conn.getDB("dynamicvariables");
     db.dropDatabase();
 
     var gameId = "gid1";
