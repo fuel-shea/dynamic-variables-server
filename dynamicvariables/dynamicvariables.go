@@ -7,25 +7,48 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+type DynoVarFactory struct {
+	MgoSess *mgo.Session
+	DBName  string
+}
+
+func NewDynoVarFactory(DBHost, DBName string) (DynoVarFactory, error) {
+	factory := DynoVarFactory{}
+	err := factory.Init(DBHost, DBName)
+	return factory, err
+}
+
+func (factory *DynoVarFactory) Init(DBHost, DBName string) error {
+	if factory.MgoSess == nil {
+		sess, err := mgo.Dial(DBHost)
+		if err != nil {
+			return err
+		}
+		factory.MgoSess = sess
+	}
+	factory.DBName = DBName
+	return nil
+}
+
+func (factory DynoVarFactory) NewDynoVarSource() (DynoVarSource, error) {
+	dvSource := DynoVarSource{}
+	sourceDB := factory.MgoSess.Copy().DB(factory.DBName)
+	err := dvSource.Init(*sourceDB)
+	return dvSource, err
+}
+
 type DynoVarSource struct {
-	MgoSess      *mgo.Session
 	MgoDB        *mgo.Database
 	GameDataColl *mgo.Collection
 	FeatsColl    *mgo.Collection
 	VarsColl     *mgo.Collection
 }
 
-func NewDynoVarSource() (DynoVarSource, error) {
-	dvs := DynoVarSource{}
-	err := dvs.Init()
-	return dvs, err
-}
-
-func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}, gameID string) (map[string]interface{}, error) {
+func (dvSource *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}, gameID string) (map[string]interface{}, error) {
 	blankReturnVal := make(map[string]interface{})
 
 	var gameDataRes bson.M
-	if err := dvs.GameDataColl.
+	if err := dvSource.GameDataColl.
 		Find(bson.M{"game_id": gameID}).
 		One(&gameDataRes); err != nil {
 		return blankReturnVal, err
@@ -51,7 +74,7 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}
 
 		var ruleIdxRes []bson.M
 		pipe.UpdateForLoop(eligibleRules, featureType, matchVal)
-		if err := dvs.FeatsColl.Pipe(pipe.Pipe).All(&ruleIdxRes); err != nil {
+		if err := dvSource.FeatsColl.Pipe(pipe.Pipe).All(&ruleIdxRes); err != nil {
 			return blankReturnVal, err
 		}
 		newEligibleRules := make([]int, len(ruleIdxRes))
@@ -71,7 +94,7 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}
 
 	winningRuleIdx := eligibleRules[0]
 	var winningRuleVars bson.M
-	if err := dvs.VarsColl.Find(bson.M{"rule_idx": winningRuleIdx}).One(&winningRuleVars); err != nil {
+	if err := dvSource.VarsColl.Find(bson.M{"rule_idx": winningRuleIdx}).One(&winningRuleVars); err != nil {
 		return blankReturnVal, err
 	}
 
@@ -83,21 +106,9 @@ func (dvs *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}
 	return result, nil
 }
 
-func (dvs *DynoVarSource) Init() error {
-	if dvs.MgoSess == nil {
-		sess, err := mgo.Dial("localhost")
-		if err != nil {
-			return err
-		}
-		dvs.MgoSess = sess
-	}
-	dvs.MgoDB = dvs.MgoSess.DB("dynamicvariables")
-	dvs.VarsColl = dvs.MgoDB.C("variables")
-	dvs.FeatsColl = dvs.MgoDB.C("features")
-	dvs.GameDataColl = dvs.MgoDB.C("game_rule_data")
+func (dvSource *DynoVarSource) Init(mgoDB mgo.Database) error {
+	dvSource.VarsColl = mgoDB.C("variables")
+	dvSource.FeatsColl = mgoDB.C("features")
+	dvSource.GameDataColl = mgoDB.C("game_rule_data")
 	return nil
-}
-
-func (dvs *DynoVarSource) CleanUp() {
-	dvs.MgoSess.Close()
 }

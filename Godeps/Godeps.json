@@ -1,14 +1,23 @@
 {
-	"ImportPath": "go-expt",
+	"ImportPath": "dynamic-variables-server",
 	"GoVersion": "go1.2.1",
 	"Deps": [
 		{
+			"ImportPath": "bitbucket.org/kardianos/osext",
+			"Comment": "null-15",
+			"Rev": "44140c5fc69ecf1102c5ef451d73cd98ef59b178"
+		},
+		{
+			"ImportPath": "github.com/fuel-shea/fuel-go-utils/fuelconfig",
+			"Rev": "39c7b33a3091e18ef68f00911bb9ea206337cc9c"
+		},
+		{
 			"ImportPath": "github.com/fuel-shea/fuel-go-utils/fuelresponder",
-			"Rev": "bf2d5e6365388b5227df02f09a88abbdde71be31"
+			"Rev": "39c7b33a3091e18ef68f00911bb9ea206337cc9c"
 		},
 		{
 			"ImportPath": "github.com/fuel-shea/fuel-go-utils/fuelutils",
-			"Rev": "bf2d5e6365388b5227df02f09a88abbdde71be31"
+			"Rev": "39c7b33a3091e18ef68f00911bb9ea206337cc9c"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",
