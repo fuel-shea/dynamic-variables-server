@@ -5,6 +5,7 @@ import (
 	"github.com/fuel-shea/fuel-go-utils/fuelutils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"time"
 )
 
 type DynoVarFactory struct {
@@ -14,27 +15,15 @@ type DynoVarFactory struct {
 
 func NewDynoVarFactory(DBHost, DBName string) (DynoVarFactory, error) {
 	factory := DynoVarFactory{}
-	err := factory.Init(DBHost, DBName)
-	return factory, err
-}
-
-func (factory *DynoVarFactory) Init(DBHost, DBName string) error {
 	if factory.MgoSess == nil {
-		sess, err := mgo.Dial(DBHost)
+		sess, err := mgo.DialWithTimeout(DBHost, time.Duration(1)*time.Second)
 		if err != nil {
-			return err
+			return factory, err
 		}
 		factory.MgoSess = sess
 	}
 	factory.DBName = DBName
-	return nil
-}
-
-func (factory DynoVarFactory) NewDynoVarSource() (DynoVarSource, error) {
-	dvSource := DynoVarSource{}
-	sourceDB := factory.MgoSess.Copy().DB(factory.DBName)
-	err := dvSource.Init(*sourceDB)
-	return dvSource, err
+	return factory, nil
 }
 
 type DynoVarSource struct {
@@ -42,6 +31,15 @@ type DynoVarSource struct {
 	GameDataColl *mgo.Collection
 	FeatsColl    *mgo.Collection
 	VarsColl     *mgo.Collection
+}
+
+func (factory DynoVarFactory) NewDynoVarSource() DynoVarSource {
+	dvSource := DynoVarSource{}
+	sourceDB := factory.MgoSess.Copy().DB(factory.DBName)
+	dvSource.VarsColl = sourceDB.C("variables")
+	dvSource.FeatsColl = sourceDB.C("features")
+	dvSource.GameDataColl = sourceDB.C("game_rule_data")
+	return dvSource
 }
 
 func (dvSource *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}, gameID string) (map[string]interface{}, error) {
@@ -53,9 +51,15 @@ func (dvSource *DynoVarSource) VarsFromFeatures(featureMatches map[string]interf
 		One(&gameDataRes); err != nil {
 		return blankReturnVal, err
 	}
-	nRules := int(gameDataRes["num_rules"].(float64))
-	featTypes := fuelutils.InterfaceArr2StringArr(gameDataRes["feature_types"].([]interface{}))
-	varTypes := fuelutils.InterfaceArr2StringArr(gameDataRes["variable_types"].([]interface{}))
+	nRules := gameDataRes["num_rules"].(int)
+	featTypes, err := fuelutils.InterfaceArr2StringArr(gameDataRes["feature_types"].([]interface{}))
+	if err != nil {
+		return blankReturnVal, err
+	}
+	varTypes, err := fuelutils.InterfaceArr2StringArr(gameDataRes["variable_types"].([]interface{}))
+	if err != nil {
+		return blankReturnVal, err
+	}
 
 	eligibleRules := make([]int, nRules)
 	for i := range eligibleRules {
@@ -79,7 +83,7 @@ func (dvSource *DynoVarSource) VarsFromFeatures(featureMatches map[string]interf
 		}
 		newEligibleRules := make([]int, len(ruleIdxRes))
 		for i, ruleIdx := range ruleIdxRes {
-			newEligibleRules[i] = int(ruleIdx["rule_idx"].(float64))
+			newEligibleRules[i] = ruleIdx["rule_idx"].(int)
 		}
 		eligibleRules = newEligibleRules
 
@@ -104,11 +108,4 @@ func (dvSource *DynoVarSource) VarsFromFeatures(featureMatches map[string]interf
 	}
 
 	return result, nil
-}
-
-func (dvSource *DynoVarSource) Init(mgoDB mgo.Database) error {
-	dvSource.VarsColl = mgoDB.C("variables")
-	dvSource.FeatsColl = mgoDB.C("features")
-	dvSource.GameDataColl = mgoDB.C("game_rule_data")
-	return nil
 }
