@@ -39,85 +39,63 @@ func TestVarsFromFeatures_equals(t *testing.T) {
 }
 
 type testCase struct {
-	gameRuleData GameRuleData
-	features     [][]Feature
-	variables    []Variable
+	gameRuleData dynamicvariables.GameRuleData
+	features     [][]dynamicvariables.Feature
+	variables    []dynamicvariables.Variable
 	query        map[string]interface{}
 	expected     map[string]interface{}
 }
 
-type GameRuleData struct {
-	GameID        string   `bson:"game_id"`
-	VariableTypes []string `bson:"variable_types"`
-	FeatureTypes  []string `bson:"feature_types"`
-	NumRules      float64  `bson:"num_rules"`
-}
-
-type Feature struct {
-	GameID  string `bson:"game_id"`
-	RuleIdx int    `bson:"rule_idx"`
-	Type    string `bson:"type"`
-	Val     string `bson:"value"`
-	Mod     string `bson:"mod"`
-}
-
-type Variable struct {
-	GameID       string  `bson:"game_id"`
-	RuleIdx      float64 `bson:"rule_idx"`
-	RandomMax    string  `bson:"randomMax"`
-	WhammyChance string  `bson:"whammyChance"`
-}
-
 var testCases = []testCase{
 	{
-		gameRuleData: GameRuleData{
-			NumRules: float64(6),
+		gameRuleData: dynamicvariables.GameRuleData{
+			NumRules: 6,
 		},
-		features: [][]Feature{
+		features: [][]dynamicvariables.Feature{
 			{
-				Feature{Val: "CA", Mod: "="},
-				Feature{Val: "iOS", Mod: "="},
-				Feature{Val: "M", Mod: "="},
+				dynamicvariables.Feature{Val: "CA", Mod: "="},
+				dynamicvariables.Feature{Val: "iOS", Mod: "="},
+				dynamicvariables.Feature{Val: "M", Mod: "="},
 			},
 			{
-				Feature{Val: "US", Mod: "="},
-				Feature{Val: "iOS", Mod: "="},
-				Feature{Val: "M", Mod: "="},
+				dynamicvariables.Feature{Val: "US", Mod: "="},
+				dynamicvariables.Feature{Val: "iOS", Mod: "="},
+				dynamicvariables.Feature{Val: "M", Mod: "="},
 			},
 			{
-				Feature{Val: "JP", Mod: "="},
-				Feature{Val: "Android", Mod: "="},
-				Feature{Val: "any", Mod: "="},
+				dynamicvariables.Feature{Val: "JP", Mod: "="},
+				dynamicvariables.Feature{Val: "Android", Mod: "="},
+				dynamicvariables.Feature{Val: "any", Mod: "="},
 			},
 			{
-				Feature{Val: "CA", Mod: "="},
-				Feature{Val: "Android", Mod: "="},
-				Feature{Val: "F", Mod: "="},
+				dynamicvariables.Feature{Val: "CA", Mod: "="},
+				dynamicvariables.Feature{Val: "Android", Mod: "="},
+				dynamicvariables.Feature{Val: "F", Mod: "="},
 			},
 			{
-				Feature{Val: "JP", Mod: "="},
-				Feature{Val: "iOS", Mod: "="},
-				Feature{Val: "any", Mod: "="},
+				dynamicvariables.Feature{Val: "JP", Mod: "="},
+				dynamicvariables.Feature{Val: "iOS", Mod: "="},
+				dynamicvariables.Feature{Val: "any", Mod: "="},
 			},
 			{
-				Feature{Val: "JP", Mod: "="},
-				Feature{Val: "iOS", Mod: "="},
-				Feature{Val: "F", Mod: "="},
+				dynamicvariables.Feature{Val: "JP", Mod: "="},
+				dynamicvariables.Feature{Val: "iOS", Mod: "="},
+				dynamicvariables.Feature{Val: "F", Mod: "="},
 			},
 			{
-				Feature{Val: "any", Mod: "="},
-				Feature{Val: "any", Mod: "="},
-				Feature{Val: "any", Mod: "="},
+				dynamicvariables.Feature{Val: "any", Mod: "="},
+				dynamicvariables.Feature{Val: "any", Mod: "="},
+				dynamicvariables.Feature{Val: "any", Mod: "="},
 			},
 		},
-		variables: []Variable{
-			Variable{RandomMax: "0", WhammyChance: "0"},
-			Variable{RandomMax: "1", WhammyChance: "1"},
-			Variable{RandomMax: "2", WhammyChance: "2"},
-			Variable{RandomMax: "3", WhammyChance: "3"},
-			Variable{RandomMax: "4", WhammyChance: "4"},
-			Variable{RandomMax: "5", WhammyChance: "5"},
-			Variable{RandomMax: "6", WhammyChance: "6"},
+		variables: []dynamicvariables.Variable{
+			dynamicvariables.Variable{RandomMax: "0", WhammyChance: "0"},
+			dynamicvariables.Variable{RandomMax: "1", WhammyChance: "1"},
+			dynamicvariables.Variable{RandomMax: "2", WhammyChance: "2"},
+			dynamicvariables.Variable{RandomMax: "3", WhammyChance: "3"},
+			dynamicvariables.Variable{RandomMax: "4", WhammyChance: "4"},
+			dynamicvariables.Variable{RandomMax: "5", WhammyChance: "5"},
+			dynamicvariables.Variable{RandomMax: "6", WhammyChance: "6"},
 		},
 		query: map[string]interface{}{
 			"Country": "JP",
@@ -156,7 +134,7 @@ func populateDB(mgoDBHost, mgoDBName string, tc testCase) error {
 	for ruleIdx, _ := range tc.features {
 		variable := tc.variables[ruleIdx]
 		variable.GameID = gameID
-		variable.RuleIdx = float64(ruleIdx)
+		variable.RuleIdx = ruleIdx
 		err := variablesColl.Insert(variable)
 		if err != nil {
 			return err

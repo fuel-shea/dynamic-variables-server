@@ -2,7 +2,6 @@ package dynamicvariables
 
 import (
 	"errors"
-	"github.com/fuel-shea/fuel-go-utils/fuelutils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"time"
@@ -45,30 +44,21 @@ func (factory DynoVarFactory) NewDynoVarSource() DynoVarSource {
 func (dvSource *DynoVarSource) VarsFromFeatures(featureMatches map[string]interface{}, gameID string) (map[string]interface{}, error) {
 	blankReturnVal := make(map[string]interface{})
 
-	var gameDataRes bson.M
+	var gameRuleData GameRuleData
 	if err := dvSource.GameDataColl.
 		Find(bson.M{"game_id": gameID}).
-		One(&gameDataRes); err != nil {
-		return blankReturnVal, err
-	}
-	nRules := int(gameDataRes["num_rules"].(float64))
-	featTypes, err := fuelutils.InterfaceArr2StringArr(gameDataRes["feature_types"].([]interface{}))
-	if err != nil {
-		return blankReturnVal, err
-	}
-	varTypes, err := fuelutils.InterfaceArr2StringArr(gameDataRes["variable_types"].([]interface{}))
-	if err != nil {
+		One(&gameRuleData); err != nil {
 		return blankReturnVal, err
 	}
 
-	eligibleRules := make([]int, nRules)
+	eligibleRules := make([]int, gameRuleData.NumRules)
 	for i := range eligibleRules {
 		eligibleRules[i] = i
 	}
 
 	pipe := PipeSkeleton(gameID)
 
-	for _, featureType := range featTypes {
+	for _, featureType := range gameRuleData.FeatureTypes {
 		matchVal, found := featureMatches[featureType]
 		if !found {
 			matchVal = "any"
@@ -76,14 +66,14 @@ func (dvSource *DynoVarSource) VarsFromFeatures(featureMatches map[string]interf
 			matchVal = matchVal.(string)
 		}
 
-		var ruleIdxRes []bson.M
+		var ruleIdxRes []map[string]int
 		pipe.UpdateForLoop(eligibleRules, featureType, matchVal)
 		if err := dvSource.FeatsColl.Pipe(pipe.Pipe).All(&ruleIdxRes); err != nil {
 			return blankReturnVal, err
 		}
 		newEligibleRules := make([]int, len(ruleIdxRes))
 		for i, ruleIdx := range ruleIdxRes {
-			newEligibleRules[i] = int(ruleIdx["rule_idx"].(float64))
+			newEligibleRules[i] = ruleIdx["rule_idx"]
 		}
 		eligibleRules = newEligibleRules
 
@@ -98,12 +88,15 @@ func (dvSource *DynoVarSource) VarsFromFeatures(featureMatches map[string]interf
 
 	winningRuleIdx := eligibleRules[0]
 	var winningRuleVars bson.M
-	if err := dvSource.VarsColl.Find(bson.M{"rule_idx": winningRuleIdx}).One(&winningRuleVars); err != nil {
+	if err := dvSource.
+		VarsColl.
+		Find(bson.M{"rule_idx": winningRuleIdx}).
+		One(&winningRuleVars); err != nil {
 		return blankReturnVal, err
 	}
 
 	result := make(map[string]interface{})
-	for _, varType := range varTypes {
+	for _, varType := range gameRuleData.VariableTypes {
 		result[varType] = winningRuleVars[varType]
 	}
 
