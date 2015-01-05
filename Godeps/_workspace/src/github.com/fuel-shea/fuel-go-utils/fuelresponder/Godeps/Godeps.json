@@ -1,0 +1,5 @@
+{
+	"ImportPath": "github.com/fuel-shea/fuel-go-utils/fuelresponder",
+	"GoVersion": "go1.2.1",
+	"Deps": []
+}

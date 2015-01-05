@@ -32,11 +32,7 @@ func main() {
 
 func FeaturesHandler(dvFact dynamicvariables.DynoVarFactory) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		dvSrc, err := dvFact.NewDynoVarSource()
-		if err != nil {
-			fuelresponder.SendError(w, fuelresponder.ErrTypes["empty_result"])
-			return
-		}
+		dvSrc := dvFact.NewDynoVarSource()
 
 		var jsonData map[string]interface{}
 		decodeErr := json.NewDecoder(r.Body).Decode(&jsonData)

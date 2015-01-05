@@ -51,7 +51,7 @@ func (dvSource *DynoVarSource) VarsFromFeatures(featureMatches map[string]interf
 		One(&gameDataRes); err != nil {
 		return blankReturnVal, err
 	}
-	nRules := gameDataRes["num_rules"].(int)
+	nRules := int(gameDataRes["num_rules"].(float64))
 	featTypes, err := fuelutils.InterfaceArr2StringArr(gameDataRes["feature_types"].([]interface{}))
 	if err != nil {
 		return blankReturnVal, err
@@ -83,7 +83,7 @@ func (dvSource *DynoVarSource) VarsFromFeatures(featureMatches map[string]interf
 		}
 		newEligibleRules := make([]int, len(ruleIdxRes))
 		for i, ruleIdx := range ruleIdxRes {
-			newEligibleRules[i] = ruleIdx["rule_idx"].(int)
+			newEligibleRules[i] = int(ruleIdx["rule_idx"].(float64))
 		}
 		eligibleRules = newEligibleRules
 

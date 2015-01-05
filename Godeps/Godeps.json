@@ -9,15 +9,15 @@
 		},
 		{
 			"ImportPath": "github.com/fuel-shea/fuel-go-utils/fuelconfig",
-			"Rev": "39c7b33a3091e18ef68f00911bb9ea206337cc9c"
+			"Rev": "df7c2b1166a5710ca0abff6208d62cbec18a3646"
 		},
 		{
 			"ImportPath": "github.com/fuel-shea/fuel-go-utils/fuelresponder",
-			"Rev": "39c7b33a3091e18ef68f00911bb9ea206337cc9c"
+			"Rev": "df7c2b1166a5710ca0abff6208d62cbec18a3646"
 		},
 		{
 			"ImportPath": "github.com/fuel-shea/fuel-go-utils/fuelutils",
-			"Rev": "39c7b33a3091e18ef68f00911bb9ea206337cc9c"
+			"Rev": "df7c2b1166a5710ca0abff6208d62cbec18a3646"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",

@@ -50,7 +50,7 @@ type GameRuleData struct {
 	GameID        string   `bson:"game_id"`
 	VariableTypes []string `bson:"variable_types"`
 	FeatureTypes  []string `bson:"feature_types"`
-	NumRules      int      `bson:"num_rules"`
+	NumRules      float64  `bson:"num_rules"`
 }
 
 type Feature struct {
@@ -62,16 +62,16 @@ type Feature struct {
 }
 
 type Variable struct {
-	GameID       string `bson:"game_id"`
-	RuleIdx      int    `bson:"rule_idx"`
-	RandomMax    string `bson:"randomMax"`
-	WhammyChance string `bson:"whammyChance"`
+	GameID       string  `bson:"game_id"`
+	RuleIdx      float64 `bson:"rule_idx"`
+	RandomMax    string  `bson:"randomMax"`
+	WhammyChance string  `bson:"whammyChance"`
 }
 
 var testCases = []testCase{
 	{
 		gameRuleData: GameRuleData{
-			NumRules: 6,
+			NumRules: float64(6),
 		},
 		features: [][]Feature{
 			{
@@ -156,7 +156,7 @@ func populateDB(mgoDBHost, mgoDBName string, tc testCase) error {
 	for ruleIdx, _ := range tc.features {
 		variable := tc.variables[ruleIdx]
 		variable.GameID = gameID
-		variable.RuleIdx = ruleIdx
+		variable.RuleIdx = float64(ruleIdx)
 		err := variablesColl.Insert(variable)
 		if err != nil {
 			return err
