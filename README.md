@@ -14,11 +14,22 @@ dynamic-variables-server
 
 1. Copy the example config files found in the `example-configs` folder into whatever directory the compiled binary will be runnin from (usually `$GOPATH/bin/`) and remove the `.example suffixes`.
 
-2. Build and compile the project
+2. For simple development testing, populate your local database:
+
+  1. Ensure you're in the same directory as `populate.js`, then start up Mongo
+  ```bash
+  $ mongo
+  ```
+  2. Run `populate.js`
+  ```javascript
+  > load("populated.js")
+  ```
+
+3. Build and compile the project
 ```bash
 $ godep go install
 ```
-3. Execute the binary
+4. Execute the binary
 ```bash
 $ $GOPATH/bin/dynamic-variables-server
 ```
