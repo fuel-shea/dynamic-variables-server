@@ -14,10 +14,3 @@ type Feature struct {
 	Val     string `bson:"value"`
 	Mod     string `bson:"mod"`
 }
-
-type Variable struct {
-	GameID       string `bson:"game_id"`
-	RuleIdx      int    `bson:"rule_idx"`
-	RandomMax    string `bson:"randomMax"`
-	WhammyChance string `bson:"whammyChance"`
-}

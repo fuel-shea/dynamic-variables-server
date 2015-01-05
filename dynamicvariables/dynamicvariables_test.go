@@ -8,6 +8,13 @@ import (
 
 var gameID = "gid"
 
+type Variable struct {
+	GameID       string `bson:"game_id"`
+	RuleIdx      int    `bson:"rule_idx"`
+	RandomMax    string `bson:"randomMax"`
+	WhammyChance string `bson:"whammyChance"`
+}
+
 func TestVarsFromFeatures_equals(t *testing.T) {
 	mgoDBHost := "localhost"
 	mgoDBName := "dynamicvariables_test"
@@ -41,7 +48,7 @@ func TestVarsFromFeatures_equals(t *testing.T) {
 type testCase struct {
 	gameRuleData dynamicvariables.GameRuleData
 	features     [][]dynamicvariables.Feature
-	variables    []dynamicvariables.Variable
+	variables    []Variable
 	query        map[string]interface{}
 	expected     map[string]interface{}
 }
@@ -88,14 +95,14 @@ var testCases = []testCase{
 				dynamicvariables.Feature{Val: "any", Mod: "="},
 			},
 		},
-		variables: []dynamicvariables.Variable{
-			dynamicvariables.Variable{RandomMax: "0", WhammyChance: "0"},
-			dynamicvariables.Variable{RandomMax: "1", WhammyChance: "1"},
-			dynamicvariables.Variable{RandomMax: "2", WhammyChance: "2"},
-			dynamicvariables.Variable{RandomMax: "3", WhammyChance: "3"},
-			dynamicvariables.Variable{RandomMax: "4", WhammyChance: "4"},
-			dynamicvariables.Variable{RandomMax: "5", WhammyChance: "5"},
-			dynamicvariables.Variable{RandomMax: "6", WhammyChance: "6"},
+		variables: []Variable{
+			Variable{RandomMax: "0", WhammyChance: "0"},
+			Variable{RandomMax: "1", WhammyChance: "1"},
+			Variable{RandomMax: "2", WhammyChance: "2"},
+			Variable{RandomMax: "3", WhammyChance: "3"},
+			Variable{RandomMax: "4", WhammyChance: "4"},
+			Variable{RandomMax: "5", WhammyChance: "5"},
+			Variable{RandomMax: "6", WhammyChance: "6"},
 		},
 		query: map[string]interface{}{
 			"Country": "JP",
